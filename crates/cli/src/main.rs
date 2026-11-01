@@ -90,6 +90,12 @@ async fn connect_database(url: &str) -> Result<Box<dyn DatabaseConnection>> {
     if url.starts_with("postgres://") || url.starts_with("postgresql://") {
         let conn = PostgresConnection::connect(url).await?;
         Ok(Box::new(conn))
+    } else if url.starts_with("mongodb://") || url.starts_with("mongodb+srv://") {
+        let conn = lyra_driver_mongodb::MongoConnection::connect(url).await?;
+        Ok(Box::new(conn))
+    } else if url.starts_with("redis://") || url.starts_with("rediss://") {
+        let conn = lyra_driver_redis::RedisConnection::connect(url).await?;
+        Ok(Box::new(conn))
     } else {
         let norm = normalize_sqlite_url(url);
         let conn = SqliteConnection::connect(&norm).await?;
