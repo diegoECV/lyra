@@ -40,7 +40,22 @@ impl SqliteConnection {
 
     /// Crea una base de datos SQLite en memoria rápida para pruebas.
     pub async fn in_memory() -> Result<Self, CoreError> {
-        Self::connect("sqlite::memory:").await
+        let options = SqliteConnectOptions::from_str("sqlite::memory:?cache=shared")
+            .map_err(|e| CoreError::ConnectionFailed(format!("URL de SQLite inválida: {e}")))?
+            .create_if_missing(true);
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .map_err(|e| {
+                CoreError::ConnectionFailed(format!("No se pudo conectar a SQLite: {e}"))
+            })?;
+
+        Ok(Self {
+            pool,
+            url: "sqlite::memory:".to_string(),
+        })
     }
 
     pub fn url(&self) -> &str {

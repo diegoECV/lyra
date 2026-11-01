@@ -1,22 +1,24 @@
+mod connection_dialog;
 mod connection_manager;
-mod query_tab;
+mod table_workspace;
 
-use connection_manager::ConnectionManager;
+use connection_manager::{ConnectionInfo, ConnectionManager};
 use libadwaita::glib;
 use libadwaita::gtk::prelude::*;
 use libadwaita::gtk::{
-    self, Align, Box as GtkBox, Button, Entry, Label, ListBox, ListBoxRow, Orientation, PolicyType,
+    self, Box as GtkBox, Button, Entry, Label, ListBox, ListBoxRow, Orientation, PolicyType,
     ScrolledWindow,
 };
 use libadwaita::prelude::*;
 use libadwaita::{
-    ActionRow, Application, ApplicationWindow, HeaderBar, NavigationPage, NavigationSplitView,
-    PreferencesGroup, TabBar, TabView, ToolbarView, Window as AdwWindow, WindowTitle,
+    ActionRow, Application, ApplicationWindow, ExpanderRow, HeaderBar, NavigationPage,
+    NavigationSplitView, PreferencesGroup, TabBar, TabView, ToolbarView, Window as AdwWindow,
+    WindowTitle,
 };
-use query_tab::QueryTab;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use table_workspace::TableWorkspace;
 
 const APP_ID: &str = "io.github.diegoecv.Lyra";
 
@@ -33,7 +35,7 @@ fn build_ui(app: &Application) {
     // 1. Cargar CSS personalizado
     load_css();
 
-    // 2. Inicializar TabView y TabBar para el área de trabajo
+    // 2. TabView y TabBar para las pestañas de trabajo
     let tab_view = TabView::new();
     let tab_bar = TabBar::builder().view(&tab_view).autohide(false).build();
 
@@ -52,7 +54,7 @@ fn build_ui(app: &Application) {
 
     let connections_group = PreferencesGroup::builder()
         .title("Bases de Datos")
-        .description("Navegación tipo carpetas (SQL & NoSQL)")
+        .description("Explorador de Esquemas (SQL &amp; NoSQL)")
         .build();
 
     sidebar_box.append(&connections_group);
@@ -123,8 +125,8 @@ fn build_ui(app: &Application) {
         .application(app)
         .title("Lyra")
         .content(&split_view)
-        .default_width(1080)
-        .default_height(720)
+        .default_width(1120)
+        .default_height(740)
         .build();
 
     // Estado compartido para gestionar conexiones
@@ -159,11 +161,19 @@ fn build_ui(app: &Application) {
 
     new_conn_btn.connect_clicked(move |_| {
         if let Some(win) = window_weak.upgrade() {
-            show_new_connection_dialog(
+            let group_inner = group_for_dialog.clone();
+            let tv_inner = tab_view_for_dialog.clone();
+
+            connection_dialog::show_connection_dialog(
                 &win,
                 mgr_for_dialog.clone(),
-                group_for_dialog.clone(),
-                tab_view_for_dialog.clone(),
+                move |info: ConnectionInfo| {
+                    let group = group_inner.clone();
+                    let tv = tv_inner.clone();
+                    glib::spawn_future_local(async move {
+                        add_connection_to_sidebar(&group, &info, &tv, false).await;
+                    });
+                },
             );
         }
     });
@@ -181,7 +191,7 @@ fn build_ui(app: &Application) {
     window.present();
 }
 
-/// Llena la barra lateral con las conexiones y sus respectivas tablas/colecciones
+/// Llena la barra lateral con las conexiones iniciales
 async fn populate_sidebar(
     group: &PreferencesGroup,
     mgr: &ConnectionManager,
@@ -192,22 +202,22 @@ async fn populate_sidebar(
     }
 }
 
-/// Añade una conexión individual a la barra lateral con sus tablas
+/// Añade una conexión individual a la barra lateral con sus tablas colapsables (ExpanderRow)
 async fn add_connection_to_sidebar(
     group: &PreferencesGroup,
-    conn_info: &connection_manager::ConnectionInfo,
+    conn_info: &ConnectionInfo,
     tab_view: &Rc<TabView>,
     auto_open_first: bool,
 ) {
-    let conn_row = ActionRow::builder()
+    let expander = ExpanderRow::builder()
         .title(&conn_info.name)
         .subtitle(conn_info.engine)
+        .expanded(true)
         .build();
 
-    conn_row.add_prefix(&gtk::Image::from_icon_name(conn_info.icon_name));
-    group.add(&conn_row);
+    expander.add_prefix(&gtk::Image::from_icon_name(conn_info.icon_name));
 
-    // Listar tablas/colecciones
+    // Listar tablas/colecciones de manera asíncrona
     let conn_arc = conn_info.connection.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
     std::thread::spawn(move || {
@@ -220,25 +230,10 @@ async fn add_connection_to_sidebar(
     });
 
     if let Ok(Ok(tables)) = rx.await {
-        let tables_list = ListBox::builder()
-            .css_classes(["boxed-list"])
-            .margin_start(16)
-            .margin_end(8)
-            .margin_bottom(8)
-            .build();
-
         let mut opened_first_tab = false;
 
         for table in tables {
-            let row = ListBoxRow::builder().build();
-            let hbox = GtkBox::builder()
-                .orientation(Orientation::Horizontal)
-                .spacing(8)
-                .margin_top(6)
-                .margin_bottom(6)
-                .margin_start(8)
-                .margin_end(8)
-                .build();
+            let row = ActionRow::builder().title(&table).activatable(true).build();
 
             let icon = if conn_info.engine == "MongoDB" {
                 "emblem-documents-symbolic"
@@ -248,16 +243,7 @@ async fn add_connection_to_sidebar(
                 "table-symbolic"
             };
 
-            let icon_img = gtk::Image::from_icon_name(icon);
-            let label = Label::builder()
-                .label(&table)
-                .hexpand(true)
-                .halign(Align::Start)
-                .build();
-
-            hbox.append(&icon_img);
-            hbox.append(&label);
-            row.set_child(Some(&hbox));
+            row.add_prefix(&gtk::Image::from_icon_name(icon));
 
             let tv_clone = tab_view.clone();
             let table_name = table.clone();
@@ -268,38 +254,30 @@ async fn add_connection_to_sidebar(
                 open_table_tab(&tv_clone, &table_name, engine_name, conn_for_tab.clone());
             });
 
-            // Abrir automáticamente la primera tabla ('pedidos') al inicio para causar impacto visual
+            // Abrir automáticamente la primera tabla ('pedidos') al inicio para mostrar la cuadrícula de datos
             if auto_open_first && !opened_first_tab && table == "pedidos" {
                 open_table_tab(tab_view, &table, engine_name, conn_info.connection.clone());
                 opened_first_tab = true;
             }
 
-            tables_list.append(&row);
+            expander.add_row(&row);
         }
 
-        group.add(&tables_list);
+        group.add(&expander);
     }
 }
 
-/// Abre una pestaña nueva con el editor SQL y la tabla de resultados
+/// Abre una pestaña nueva con el espacio de trabajo de la tabla (Datos, Consulta, Estructura)
 fn open_table_tab(
     tab_view: &TabView,
     table_name: &str,
     engine: &str,
     conn: Arc<dyn lyra_core::DatabaseConnection>,
 ) {
-    let query = if engine == "MongoDB" {
-        format!("{table_name}.find({{}})")
-    } else if engine == "Redis" {
-        format!("GET {table_name}")
-    } else {
-        format!("SELECT * FROM {table_name};")
-    };
-
     let tab_title = format!("{table_name} ({engine})");
-    let (tab_widget, run_btn) = QueryTab::new(&tab_title, &query, conn);
+    let workspace = TableWorkspace::new(table_name, engine, conn);
 
-    let page = tab_view.append(&tab_widget.container);
+    let page = tab_view.append(&workspace.container);
     page.set_title(&tab_title);
     page.set_icon(Some(&libadwaita::gio::ThemedIcon::new(
         if engine == "MongoDB" {
@@ -312,129 +290,6 @@ fn open_table_tab(
     )));
 
     tab_view.set_selected_page(&page);
-
-    // Auto-ejecutar consulta inicial para poblar la vista
-    run_btn.emit_clicked();
-}
-
-/// Diálogo para añadir nuevas conexiones
-fn show_new_connection_dialog(
-    parent: &ApplicationWindow,
-    mgr_cell: Rc<RefCell<Option<ConnectionManager>>>,
-    group: PreferencesGroup,
-    tab_view: Rc<TabView>,
-) {
-    let dialog = AdwWindow::builder()
-        .transient_for(parent)
-        .modal(true)
-        .title("Nueva Conexión")
-        .default_width(480)
-        .default_height(340)
-        .build();
-
-    let content_box = GtkBox::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(12)
-        .margin_top(16)
-        .margin_bottom(16)
-        .margin_start(16)
-        .margin_end(16)
-        .build();
-
-    let header = HeaderBar::builder()
-        .title_widget(&WindowTitle::new("Añadir Base de Datos", "SQL o NoSQL"))
-        .show_end_title_buttons(true)
-        .build();
-
-    let name_entry = Entry::builder()
-        .placeholder_text("Nombre de la conexión (ej. PostgreSQL Local)")
-        .text("Mi Base de Datos")
-        .build();
-
-    let url_entry = Entry::builder()
-        .placeholder_text("Cadena de conexión (postgres://, mongodb://, redis://, sqlite://)")
-        .text("sqlite::memory:")
-        .build();
-
-    let status_lbl = Label::builder().css_classes(["dim-label"]).build();
-
-    let connect_btn = Button::builder()
-        .label("Conectar")
-        .css_classes(["suggested-action", "pill"])
-        .halign(Align::End)
-        .build();
-
-    content_box.append(&name_entry);
-    content_box.append(&url_entry);
-    content_box.append(&status_lbl);
-    content_box.append(&connect_btn);
-
-    let toolbar = ToolbarView::new();
-    toolbar.add_top_bar(&header);
-    toolbar.set_content(Some(&content_box));
-
-    dialog.set_content(Some(&toolbar));
-
-    let dialog_clone = dialog.clone();
-    connect_btn.connect_clicked(move |btn| {
-        let name = name_entry.text().to_string();
-        let url = url_entry.text().to_string();
-        btn.set_sensitive(false);
-        btn.set_label("Conectando...");
-
-        let mgr_c = mgr_cell.clone();
-        let group_c = group.clone();
-        let tv_c = tab_view.clone();
-        let dlg = dialog_clone.clone();
-        let btn_clone = btn.clone();
-
-        glib::spawn_future_local(async move {
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let url_for_thread = url.clone();
-            std::thread::spawn(move || {
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-
-                let res = rt.block_on(ConnectionManager::create_connection(&url_for_thread));
-                let _ = tx.send(res);
-            });
-
-            if let Ok(res) = rx.await {
-                match res {
-                    Ok((conn, engine, icon_name)) => {
-                        let conn_id = format!(
-                            "conn_{}",
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_millis()
-                        );
-                        let info = connection_manager::ConnectionInfo {
-                            id: conn_id,
-                            name,
-                            engine,
-                            icon_name,
-                            connection: conn,
-                        };
-                        add_connection_to_sidebar(&group_c, &info, &tv_c, false).await;
-                        if let Some(ref mut m) = *mgr_c.borrow_mut() {
-                            m.add_info(info);
-                        }
-                        dlg.close();
-                    }
-                    Err(e) => {
-                        btn_clone.set_label("Error");
-                        btn_clone.set_sensitive(true);
-                        eprintln!("Error conectando: {e}");
-                    }
-                }
-            }
-        });
-    });
-
-    dialog.present();
 }
 
 /// Diálogo para búsqueda rápida (Ctrl+K)

@@ -1,53 +1,170 @@
-/* Estilos personalizados para Lyra */
+/* Lyra - Modern GNOME / Libadwaita Dark Theme Stylesheet */
 
-.lyra-header {
-    background-color: #1A1635;
-    color: #FFFFFF;
-}
+/* System Accent & Variables */
+@define-color lyra_accent #3584e4;
+@define-color lyra_accent_subtle rgba(53, 132, 228, 0.15);
+@define-color lyra_card_bg rgba(255, 255, 255, 0.04);
+@define-color lyra_border rgba(255, 255, 255, 0.08);
+@define-color lyra_border_strong rgba(255, 255, 255, 0.14);
 
-.lyra-accent-btn {
-    background-color: #5B4BD6;
-    color: #FFFFFF;
-    font-weight: bold;
-    border-radius: 8px;
-    padding: 6px 14px;
-}
-
-.lyra-accent-btn:hover {
-    background-color: #6C5CE7;
-}
-
-.env-badge-dev {
+/* Badges & Tags */
+.badge-dev {
     background-color: rgba(46, 194, 126, 0.15);
     color: #2ec27e;
     font-size: 11px;
-    font-weight: bold;
-    border-radius: 12px;
-    padding: 3px 10px;
+    font-weight: 600;
+    border-radius: 9999px;
+    padding: 2px 10px;
 }
 
-.query-editor {
+.badge-pk {
+    background-color: rgba(246, 97, 81, 0.2);
+    color: #f66151;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.badge-fk {
+    background-color: rgba(53, 132, 228, 0.2);
+    color: #62a0ea;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.badge-type {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #9a9996;
+    font-size: 10px;
     font-family: monospace;
-    font-size: 13px;
-    padding: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+.badge-engine {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #deddda;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 2px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.badge-success {
+    background-color: rgba(46, 194, 126, 0.15);
+    color: #2ec27e;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+.badge-error {
+    background-color: rgba(224, 27, 36, 0.15);
+    color: #e01b24;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+/* Data Table Grid */
+.grid-container {
     background-color: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 8px;
 }
 
-.table-header-cell {
-    font-weight: bold;
-    padding: 8px 12px;
+.grid-header-cell {
+    font-weight: 600;
+    font-size: 12px;
+    color: #deddda;
+    padding: 9px 14px;
     background-color: rgba(255, 255, 255, 0.05);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.table-data-cell {
-    padding: 6px 12px;
+.grid-row-idx {
+    font-family: monospace;
+    font-size: 11px;
+    color: #77767b;
+    padding: 7px 12px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.table-data-cell-alt {
-    padding: 6px 12px;
-    background-color: rgba(255, 255, 255, 0.02);
+.grid-data-cell {
+    font-size: 13px;
+    color: #ffffff;
+    padding: 7px 14px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.grid-data-cell-alt {
+    font-size: 13px;
+    color: #ffffff;
+    padding: 7px 14px;
+    background-color: rgba(255, 255, 255, 0.015);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* SQL & Query Console */
+.query-editor-box {
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.query-editor-view {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background-color: transparent;
+    color: #ffffff;
+}
+
+/* Engine Selection Cards */
+.engine-card {
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    transition: all 150ms ease-in-out;
+}
+
+.engine-card:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.engine-card-selected {
+    border: 2px solid #3584e4;
+    background-color: rgba(53, 132, 228, 0.15);
+}
+
+/* Status Bar & Footers */
+.status-bar-box {
+    padding: 4px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+.subtle-label {
+    font-size: 11px;
+    color: #9a9996;
+}
+
+.bold-title {
+    font-weight: 700;
+    font-size: 15px;
 }
