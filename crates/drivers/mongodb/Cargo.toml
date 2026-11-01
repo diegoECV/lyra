@@ -1,0 +1,16 @@
+[package]
+name = "lyra-driver-mongodb"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+lyra-core = { workspace = true }
+async-trait = { workspace = true }
+mongodb = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures = { workspace = true }
