@@ -90,6 +90,9 @@ async fn connect_database(url: &str) -> Result<Box<dyn DatabaseConnection>> {
     if url.starts_with("postgres://") || url.starts_with("postgresql://") {
         let conn = PostgresConnection::connect(url).await?;
         Ok(Box::new(conn))
+    } else if url.starts_with("mysql://") || url.starts_with("mariadb://") {
+        let conn = lyra_driver_mysql::MySqlConnection::connect(url).await?;
+        Ok(Box::new(conn))
     } else if url.starts_with("mongodb://") || url.starts_with("mongodb+srv://") {
         let conn = lyra_driver_mongodb::MongoConnection::connect(url).await?;
         Ok(Box::new(conn))

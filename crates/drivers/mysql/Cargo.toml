@@ -1,0 +1,14 @@
+[package]
+name = "lyra-driver-mysql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+lyra-core = { workspace = true }
+async-trait = { workspace = true }
+sqlx = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

@@ -17,6 +17,7 @@ use std::time::Instant;
 enum EngineType {
     Sqlite,
     Postgres,
+    Mysql,
     Mongo,
     Redis,
 }
@@ -32,7 +33,7 @@ pub fn show_connection_dialog<F>(
         .transient_for(parent)
         .modal(true)
         .title("Nueva Conexión")
-        .default_width(560)
+        .default_width(580)
         .default_height(600)
         .build();
 
@@ -62,7 +63,7 @@ pub fn show_connection_dialog<F>(
 
     let cards_box = GtkBox::builder()
         .orientation(Orientation::Horizontal)
-        .spacing(10)
+        .spacing(8)
         .homogeneous(true)
         .build();
 
@@ -97,15 +98,17 @@ pub fn show_connection_dialog<F>(
             .build()
     }
 
-    let sqlite_card = create_engine_card("drive-harddisk-symbolic", "SQLite", "Local / Memoria");
+    let sqlite_card = create_engine_card("drive-harddisk-symbolic", "SQLite", "Local / Mem");
     sqlite_card.add_css_class("engine-card-selected");
 
-    let pg_card = create_engine_card("network-server-symbolic", "PostgreSQL", "Puerto 5432");
-    let mongo_card = create_engine_card("emblem-documents-symbolic", "MongoDB", "Puerto 27017");
-    let redis_card = create_engine_card("view-list-bullet-symbolic", "Redis", "Puerto 6379");
+    let pg_card = create_engine_card("network-server-symbolic", "PostgreSQL", "P. 5432");
+    let mysql_card = create_engine_card("network-server-symbolic", "MySQL", "P. 3306");
+    let mongo_card = create_engine_card("emblem-documents-symbolic", "MongoDB", "P. 27017");
+    let redis_card = create_engine_card("view-list-bullet-symbolic", "Redis", "P. 6379");
 
     cards_box.append(&sqlite_card);
     cards_box.append(&pg_card);
+    cards_box.append(&mysql_card);
     cards_box.append(&mongo_card);
     cards_box.append(&redis_card);
     content_box.append(&cards_box);
@@ -191,6 +194,21 @@ pub fn show_connection_dialog<F>(
                 pass.set_text("");
                 uri.set_text("postgres://postgres@localhost:5432/postgres");
             }
+            EngineType::Mysql => {
+                host.set_visible(true);
+                port.set_visible(true);
+                db.set_visible(true);
+                user.set_visible(true);
+                pass.set_visible(true);
+                uri.set_visible(true);
+                name.set_text("MySQL / MariaDB Servidor");
+                host.set_text("localhost");
+                port.set_text("3306");
+                db.set_text("mi_base");
+                user.set_text("root");
+                pass.set_text("");
+                uri.set_text("mysql://root@localhost:3306/mi_base");
+            }
             EngineType::Mongo => {
                 host.set_visible(true);
                 port.set_visible(true);
@@ -262,6 +280,23 @@ pub fn show_connection_dialog<F>(
                         format!("postgres://{u}:{pwd}@{h}:{p}/{d}")
                     }
                 }
+                EngineType::Mysql => {
+                    let h = host.text();
+                    let p = port.text();
+                    let d = db.text();
+                    let u = user.text();
+                    let pwd = pass.text();
+
+                    if !direct_uri.is_empty()
+                        && (direct_uri.starts_with("mysql") || direct_uri.starts_with("mariadb"))
+                    {
+                        direct_uri
+                    } else if pwd.is_empty() {
+                        format!("mysql://{u}@{h}:{p}/{d}")
+                    } else {
+                        format!("mysql://{u}:{pwd}@{h}:{p}/{d}")
+                    }
+                }
                 EngineType::Mongo => {
                     let h = host.text();
                     let p = port.text();
@@ -298,6 +333,7 @@ pub fn show_connection_dialog<F>(
     let cards = [
         sqlite_card.clone(),
         pg_card.clone(),
+        mysql_card.clone(),
         mongo_card.clone(),
         redis_card.clone(),
     ];
@@ -340,8 +376,19 @@ pub fn show_connection_dialog<F>(
         let sel = select_card.clone();
         let update = update_form_for_engine.clone();
         let curr = current_engine.clone();
-        mongo_card.connect_clicked(move |_| {
+        mysql_card.connect_clicked(move |_| {
             sel(2);
+            *curr.borrow_mut() = EngineType::Mysql;
+            update(EngineType::Mysql);
+        });
+    }
+
+    {
+        let sel = select_card.clone();
+        let update = update_form_for_engine.clone();
+        let curr = current_engine.clone();
+        mongo_card.connect_clicked(move |_| {
+            sel(3);
             *curr.borrow_mut() = EngineType::Mongo;
             update(EngineType::Mongo);
         });
@@ -352,7 +399,7 @@ pub fn show_connection_dialog<F>(
         let update = update_form_for_engine;
         let curr = current_engine.clone();
         redis_card.connect_clicked(move |_| {
-            sel(3);
+            sel(4);
             *curr.borrow_mut() = EngineType::Redis;
             update(EngineType::Redis);
         });

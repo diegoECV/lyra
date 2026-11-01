@@ -1,5 +1,6 @@
 use lyra_core::DatabaseConnection;
 use lyra_driver_mongodb::MongoConnection;
+use lyra_driver_mysql::MySqlConnection;
 use lyra_driver_postgres::PostgresConnection;
 use lyra_driver_redis::RedisConnection;
 use lyra_driver_sqlite::SqliteConnection;
@@ -125,6 +126,9 @@ impl ConnectionManager {
         if url.starts_with("postgres://") || url.starts_with("postgresql://") {
             let c = PostgresConnection::connect(url).await?;
             Ok((Arc::new(c), "PostgreSQL", "network-server-symbolic"))
+        } else if url.starts_with("mysql://") || url.starts_with("mariadb://") {
+            let c = MySqlConnection::connect(url).await?;
+            Ok((Arc::new(c), "MySQL / MariaDB", "network-server-symbolic"))
         } else if url.starts_with("mongodb://") || url.starts_with("mongodb+srv://") {
             let c = MongoConnection::connect(url).await?;
             Ok((Arc::new(c), "MongoDB", "emblem-documents-symbolic"))

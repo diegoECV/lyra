@@ -4,6 +4,7 @@ members = [
     "crates/core",
     "crates/drivers/sqlite",
     "crates/drivers/postgres",
+    "crates/drivers/mysql",
     "crates/drivers/mongodb",
     "crates/drivers/redis",
     "crates/cli",
@@ -23,6 +24,7 @@ readme = "README.md"
 lyra-core = { path = "crates/core" }
 lyra-driver-sqlite = { path = "crates/drivers/sqlite" }
 lyra-driver-postgres = { path = "crates/drivers/postgres" }
+lyra-driver-mysql = { path = "crates/drivers/mysql" }
 lyra-driver-mongodb = { path = "crates/drivers/mongodb" }
 lyra-driver-redis = { path = "crates/drivers/redis" }
 
@@ -48,7 +50,7 @@ secrecy = { version = "0.10", features = ["serde"] }
 async-trait = "0.1"
 
 # Database drivers
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "postgres"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "postgres", "mysql"] }
 mongodb = "3.9"
 redis = { version = "0.28", features = ["tokio-comp"] }
 
