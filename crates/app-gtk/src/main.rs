@@ -52,8 +52,8 @@ fn build_ui(app: &Application) {
     group.add(&row_stack);
 
     let row_drivers = ActionRow::builder()
-        .title("Drivers Iniciales")
-        .subtitle("SQLite y PostgreSQL compilados y listos")
+        .title("Drivers Multi-Motor")
+        .subtitle("SQLite, PostgreSQL, MongoDB y Redis listos")
         .build();
     row_drivers.add_prefix(&gtk::Image::from_icon_name("drive-harddisk-symbolic"));
     group.add(&row_drivers);
