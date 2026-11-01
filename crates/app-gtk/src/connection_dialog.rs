@@ -121,15 +121,9 @@ pub fn show_connection_dialog<F>(
         .text("Base de Datos SQLite")
         .build();
 
-    let host_row = EntryRow::builder()
-        .title("Host")
-        .text("localhost")
-        .build();
+    let host_row = EntryRow::builder().title("Host").text("localhost").build();
 
-    let port_row = EntryRow::builder()
-        .title("Puerto")
-        .text("5432")
-        .build();
+    let port_row = EntryRow::builder().title("Puerto").text("5432").build();
 
     let db_row = EntryRow::builder()
         .title("Base de Datos / Colección")
@@ -141,9 +135,7 @@ pub fn show_connection_dialog<F>(
         .text("postgres")
         .build();
 
-    let pass_row = PasswordEntryRow::builder()
-        .title("Contraseña")
-        .build();
+    let pass_row = PasswordEntryRow::builder().title("Contraseña").build();
 
     let uri_row = EntryRow::builder()
         .title("Cadena de Conexión (URI)")
@@ -173,61 +165,59 @@ pub fn show_connection_dialog<F>(
         let uri = uri_row.clone();
         let name = name_row.clone();
 
-        move |engine: EngineType| {
-            match engine {
-                EngineType::Sqlite => {
-                    host.set_visible(false);
-                    port.set_visible(false);
-                    db.set_visible(false);
-                    user.set_visible(false);
-                    pass.set_visible(false);
-                    uri.set_visible(true);
-                    name.set_text("Base de Datos SQLite");
-                    uri.set_text("sqlite::memory:");
-                }
-                EngineType::Postgres => {
-                    host.set_visible(true);
-                    port.set_visible(true);
-                    db.set_visible(true);
-                    user.set_visible(true);
-                    pass.set_visible(true);
-                    uri.set_visible(true);
-                    name.set_text("PostgreSQL Servidor");
-                    host.set_text("localhost");
-                    port.set_text("5432");
-                    db.set_text("postgres");
-                    user.set_text("postgres");
-                    pass.set_text("");
-                    uri.set_text("postgres://postgres@localhost:5432/postgres");
-                }
-                EngineType::Mongo => {
-                    host.set_visible(true);
-                    port.set_visible(true);
-                    db.set_visible(true);
-                    user.set_visible(true);
-                    pass.set_visible(true);
-                    uri.set_visible(true);
-                    name.set_text("MongoDB Colecciones");
-                    host.set_text("localhost");
-                    port.set_text("27017");
-                    db.set_text("admin");
-                    user.set_text("");
-                    pass.set_text("");
-                    uri.set_text("mongodb://localhost:27017/admin");
-                }
-                EngineType::Redis => {
-                    host.set_visible(true);
-                    port.set_visible(true);
-                    db.set_visible(false);
-                    user.set_visible(false);
-                    pass.set_visible(true);
-                    uri.set_visible(true);
-                    name.set_text("Redis Caché");
-                    host.set_text("127.0.0.1");
-                    port.set_text("6379");
-                    pass.set_text("");
-                    uri.set_text("redis://127.0.0.1:6379");
-                }
+        move |engine: EngineType| match engine {
+            EngineType::Sqlite => {
+                host.set_visible(false);
+                port.set_visible(false);
+                db.set_visible(false);
+                user.set_visible(false);
+                pass.set_visible(false);
+                uri.set_visible(true);
+                name.set_text("Base de Datos SQLite");
+                uri.set_text("sqlite::memory:");
+            }
+            EngineType::Postgres => {
+                host.set_visible(true);
+                port.set_visible(true);
+                db.set_visible(true);
+                user.set_visible(true);
+                pass.set_visible(true);
+                uri.set_visible(true);
+                name.set_text("PostgreSQL Servidor");
+                host.set_text("localhost");
+                port.set_text("5432");
+                db.set_text("postgres");
+                user.set_text("postgres");
+                pass.set_text("");
+                uri.set_text("postgres://postgres@localhost:5432/postgres");
+            }
+            EngineType::Mongo => {
+                host.set_visible(true);
+                port.set_visible(true);
+                db.set_visible(true);
+                user.set_visible(true);
+                pass.set_visible(true);
+                uri.set_visible(true);
+                name.set_text("MongoDB Colecciones");
+                host.set_text("localhost");
+                port.set_text("27017");
+                db.set_text("admin");
+                user.set_text("");
+                pass.set_text("");
+                uri.set_text("mongodb://localhost:27017/admin");
+            }
+            EngineType::Redis => {
+                host.set_visible(true);
+                port.set_visible(true);
+                db.set_visible(false);
+                user.set_visible(false);
+                pass.set_visible(true);
+                uri.set_visible(true);
+                name.set_text("Redis Caché");
+                host.set_text("127.0.0.1");
+                port.set_text("6379");
+                pass.set_text("");
+                uri.set_text("redis://127.0.0.1:6379");
             }
         }
     };
@@ -305,7 +295,12 @@ pub fn show_connection_dialog<F>(
     };
 
     // Eventos de selección de tarjeta
-    let cards = [sqlite_card.clone(), pg_card.clone(), mongo_card.clone(), redis_card.clone()];
+    let cards = [
+        sqlite_card.clone(),
+        pg_card.clone(),
+        mongo_card.clone(),
+        redis_card.clone(),
+    ];
     let select_card = {
         let cards = cards.clone();
         move |selected_idx: usize| {
@@ -373,7 +368,9 @@ pub fn show_connection_dialog<F>(
         .title("Probar Conexión")
         .subtitle("Pulsa 'Probar' para verificar la latencia y credenciales")
         .build();
-    test_action_row.add_prefix(&gtk::Image::from_icon_name("network-transmit-receive-symbolic"));
+    test_action_row.add_prefix(&gtk::Image::from_icon_name(
+        "network-transmit-receive-symbolic",
+    ));
 
     let test_btn = Button::builder()
         .label("⚡ Probar")

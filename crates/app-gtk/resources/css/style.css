@@ -10,17 +10,17 @@
 @define-color lyra_border rgba(255, 255, 255, 0.08);
 @define-color lyra_border_strong rgba(255, 255, 255, 0.14);
 
-.suggested-action {
-    background-color: #3584e4 !important;
-    color: #ffffff !important;
+button.suggested-action {
+    background-color: #3584e4;
+    color: #ffffff;
 }
 
-.suggested-action:hover {
-    background-color: #1c71d8 !important;
+button.suggested-action:hover {
+    background-color: #1c71d8;
 }
 
-.suggested-action:active {
-    background-color: #1a5fb4 !important;
+button.suggested-action:active {
+    background-color: #1a5fb4;
 }
 
 /* Badges & Tags */
@@ -163,9 +163,9 @@
     border-color: rgba(255, 255, 255, 0.2);
 }
 
-.engine-card-selected {
-    border: 2px solid #3584e4 !important;
-    background-color: rgba(53, 132, 228, 0.16) !important;
+button.engine-card-selected {
+    border: 2px solid #3584e4;
+    background-color: rgba(53, 132, 228, 0.16);
 }
 
 /* Status Bar & Footers */

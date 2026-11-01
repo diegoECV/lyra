@@ -4,8 +4,13 @@ use libadwaita::gtk::{
     self, Align, Box as GtkBox, Button, Entry, Grid, Label, Orientation, PolicyType,
     ScrolledWindow, TextView,
 };
-use libadwaita::{ViewStack, ViewSwitcher};
+use libadwaita::prelude::*;
+use libadwaita::{
+    ActionRow, EntryRow, HeaderBar, PreferencesGroup, ToolbarView, ViewStack, ViewSwitcher,
+    Window as AdwWindow, WindowTitle,
+};
 use lyra_core::{DatabaseConnection, QueryResult, TableSchema};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -71,7 +76,7 @@ impl TableWorkspace {
             .policy(libadwaita::ViewSwitcherPolicy::Wide)
             .build();
 
-        // Acciones derecha: Refrescar y Filtro
+        // Acciones derecha: Filtro, Exportar y Refrescar
         let actions_box = GtkBox::builder()
             .orientation(Orientation::Horizontal)
             .spacing(8)
@@ -84,12 +89,18 @@ impl TableWorkspace {
             .width_chars(20)
             .build();
 
+        let export_btn = Button::builder()
+            .icon_name("document-save-symbolic")
+            .tooltip_text("Exportar datos a CSV o JSON")
+            .build();
+
         let refresh_btn = Button::builder()
             .icon_name("view-refresh-symbolic")
             .tooltip_text("Recargar datos")
             .build();
 
         actions_box.append(&filter_entry);
+        actions_box.append(&export_btn);
         actions_box.append(&refresh_btn);
 
         top_bar.append(&title_box);
@@ -99,11 +110,15 @@ impl TableWorkspace {
         // ==========================================
         // VISTA 1: DATOS (Data Grid interactiva)
         // ==========================================
-        let (data_page_box, data_status_lbl, reload_data_trigger) =
-            build_data_view(table_name, engine, conn.clone());
+        let data_view = build_data_view(table_name, engine, conn.clone());
 
-        let data_page = view_stack.add_titled(&data_page_box, Some("data"), "Datos");
+        let data_page = view_stack.add_titled(&data_view.container, Some("data"), "Datos");
         data_page.set_icon_name(Some("view-list-symbolic"));
+
+        let reload_data_trigger = data_view.reload_fn.clone();
+        let current_result_cell = data_view.current_result;
+        let grid_box_ref = data_view.grid_container;
+        let data_status_lbl = data_view.status_label;
 
         // ==========================================
         // VISTA 2: CONSULTA (Consola SQL / Query)
@@ -125,10 +140,61 @@ impl TableWorkspace {
             reload_trigger();
         });
 
-        // Conectar filtro al presionar Enter
-        let reload_trigger_filter = reload_data_trigger.clone();
-        filter_entry.connect_activate(move |_| {
-            reload_trigger_filter();
+        // Filtro en tiempo real al escribir en la barra de búsqueda
+        let current_res_filter = current_result_cell.clone();
+        let grid_filter = grid_box_ref;
+        let status_filter = data_status_lbl.clone();
+        let eng_filter = engine.to_string();
+
+        filter_entry.connect_changed(move |entry| {
+            let query = entry.text().trim().to_lowercase();
+            let res_guard = current_res_filter.borrow();
+            if let Some(ref res) = *res_guard {
+                while let Some(child) = grid_filter.first_child() {
+                    grid_filter.remove(&child);
+                }
+
+                if query.is_empty() {
+                    let grid_widget = render_table_grid(res);
+                    grid_filter.append(&grid_widget);
+                    status_filter.set_text(&format!(
+                        "Mostrando {} registros • {} ms • Motor: {eng_filter}",
+                        res.rows.len(),
+                        res.execution_time_ms
+                    ));
+                } else {
+                    let filtered_rows: Vec<_> = res
+                        .rows
+                        .iter()
+                        .filter(|row| {
+                            row.values
+                                .iter()
+                                .any(|v| v.to_string().to_lowercase().contains(&query))
+                        })
+                        .cloned()
+                        .collect();
+
+                    let count = filtered_rows.len();
+                    let mut filtered_res = res.clone();
+                    filtered_res.rows = filtered_rows;
+
+                    let grid_widget = render_table_grid(&filtered_res);
+                    grid_filter.append(&grid_widget);
+                    status_filter.set_text(&format!(
+                        "Mostrando {count} de {} registros (filtro: \"{query}\") • Motor: {eng_filter}",
+                        res.rows.len()
+                    ));
+                }
+            }
+        });
+
+        // Botón exportar datos (CSV / JSON)
+        let current_res_export = current_result_cell;
+        let t_name_export = table_name.to_string();
+        let root_for_export = root.clone();
+
+        export_btn.connect_clicked(move |_| {
+            show_export_dialog(&root_for_export, &t_name_export, current_res_export.clone());
         });
 
         // 3. Barra de estado inferior
@@ -157,14 +223,20 @@ impl TableWorkspace {
     }
 }
 
+struct DataViewComponents {
+    container: GtkBox,
+    status_label: Label,
+    reload_fn: Rc<dyn Fn()>,
+    grid_container: GtkBox,
+    current_result: Rc<RefCell<Option<QueryResult>>>,
+}
+
 /// Construye la vista de datos (Grilla interactiva)
 fn build_data_view(
     table_name: &str,
     engine: &str,
     conn: Arc<dyn DatabaseConnection>,
-) -> (GtkBox, Label, Rc<dyn Fn()>) {
-    use std::rc::Rc;
-
+) -> DataViewComponents {
     let box_container = GtkBox::builder()
         .orientation(Orientation::Vertical)
         .vexpand(true)
@@ -203,6 +275,8 @@ fn build_data_view(
     let eng = engine.to_string();
     let status_lbl_c = status_label.clone();
     let grid_c = grid_container.clone();
+    let current_res_cell: Rc<RefCell<Option<QueryResult>>> = Rc::new(RefCell::new(None));
+    let current_res_cell_clone = current_res_cell.clone();
 
     let reload_fn = Rc::new(move || {
         let conn = conn.clone();
@@ -210,6 +284,7 @@ fn build_data_view(
         let eng = eng.clone();
         let status_lbl = status_lbl_c.clone();
         let grid_box = grid_c.clone();
+        let res_cell = current_res_cell_clone.clone();
 
         status_lbl.set_text("Recuperando registros...");
 
@@ -248,10 +323,13 @@ fn build_data_view(
                             query_res.execution_time_ms
                         ));
 
+                        *res_cell.borrow_mut() = Some(query_res.clone());
+
                         let grid_widget = render_table_grid(&query_res);
                         grid_box.append(&grid_widget);
                     }
                     Err(err) => {
+                        *res_cell.borrow_mut() = None;
                         status_lbl.set_text(&format!("Error cargando datos: {err}"));
                         let err_box = GtkBox::builder()
                             .orientation(Orientation::Vertical)
@@ -275,7 +353,193 @@ fn build_data_view(
         });
     });
 
-    (box_container, status_label, reload_fn)
+    DataViewComponents {
+        container: box_container,
+        status_label,
+        reload_fn,
+        grid_container,
+        current_result: current_res_cell,
+    }
+}
+
+/// Diálogo para exportar datos en formato CSV o JSON
+fn show_export_dialog(
+    parent: &GtkBox,
+    table_name: &str,
+    current_res: Rc<RefCell<Option<QueryResult>>>,
+) {
+    let root_win = parent.root().and_downcast::<AdwWindow>();
+
+    let dialog = AdwWindow::builder()
+        .modal(true)
+        .title("Exportar Datos")
+        .default_width(480)
+        .default_height(320)
+        .build();
+
+    if let Some(ref win) = root_win {
+        dialog.set_transient_for(Some(win));
+    }
+
+    let vbox = GtkBox::builder()
+        .orientation(Orientation::Vertical)
+        .spacing(16)
+        .margin_start(20)
+        .margin_end(20)
+        .margin_top(16)
+        .margin_bottom(20)
+        .build();
+
+    let pref_group = PreferencesGroup::builder()
+        .title("Opciones de Exportación")
+        .description(format!("Exportando datos de la tabla: {table_name}"))
+        .build();
+
+    // Selector de formato (CSV o JSON)
+    let format_row = ActionRow::builder()
+        .title("Formato")
+        .subtitle("Selecciona el formato de archivo de salida")
+        .build();
+
+    let format_box = GtkBox::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(8)
+        .valign(Align::Center)
+        .build();
+
+    let csv_btn = Button::builder()
+        .label("📄 CSV")
+        .css_classes(["engine-card", "engine-card-selected"])
+        .build();
+
+    let json_btn = Button::builder()
+        .label("📋 JSON")
+        .css_classes(["engine-card"])
+        .build();
+
+    format_box.append(&csv_btn);
+    format_box.append(&json_btn);
+    format_row.add_suffix(&format_box);
+    pref_group.add(&format_row);
+
+    // Ruta de destino por defecto en ~/Descargas o HOME
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let default_dir = if std::path::Path::new(&format!("{home}/Descargas")).exists() {
+        format!("{home}/Descargas")
+    } else {
+        home
+    };
+
+    let path_row = EntryRow::builder()
+        .title("Ruta del archivo")
+        .text(format!("{default_dir}/{table_name}.csv"))
+        .build();
+    pref_group.add(&path_row);
+
+    let status_lbl = Label::builder().label("").halign(Align::Start).build();
+
+    vbox.append(&pref_group);
+    vbox.append(&status_lbl);
+
+    let is_json = Rc::new(RefCell::new(false));
+
+    // Cambiar a formato CSV
+    {
+        let is_json_c = is_json.clone();
+        let path_r = path_row.clone();
+        let csv_b = csv_btn.clone();
+        let json_b = json_btn.clone();
+        let def_dir = default_dir.clone();
+        let t_name = table_name.to_string();
+
+        csv_btn.connect_clicked(move |_| {
+            *is_json_c.borrow_mut() = false;
+            csv_b.add_css_class("engine-card-selected");
+            json_b.remove_css_class("engine-card-selected");
+            path_r.set_text(&format!("{def_dir}/{t_name}.csv"));
+        });
+    }
+
+    // Cambiar a formato JSON
+    {
+        let is_json_c = is_json.clone();
+        let path_r = path_row.clone();
+        let csv_b = csv_btn;
+        let json_b = json_btn;
+        let def_dir = default_dir;
+        let t_name = table_name.to_string();
+        let json_b_inner = json_b.clone();
+        json_b.connect_clicked(move |_| {
+            *is_json_c.borrow_mut() = true;
+            json_b_inner.add_css_class("engine-card-selected");
+            csv_b.remove_css_class("engine-card-selected");
+            path_r.set_text(&format!("{def_dir}/{t_name}.json"));
+        });
+    }
+
+    // Botones HeaderBar
+    let cancel_btn = Button::builder().label("Cancelar").build();
+    let save_btn = Button::builder()
+        .label("Guardar")
+        .css_classes(["suggested-action", "pill"])
+        .build();
+
+    let header = HeaderBar::builder()
+        .title_widget(&WindowTitle::new("Exportar", table_name))
+        .show_end_title_buttons(false)
+        .build();
+    header.pack_start(&cancel_btn);
+    header.pack_end(&save_btn);
+
+    let toolbar = ToolbarView::new();
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(&vbox));
+    dialog.set_content(Some(&toolbar));
+
+    let dlg_c = dialog.clone();
+    cancel_btn.connect_clicked(move |_| {
+        dlg_c.close();
+    });
+
+    // Guardar archivo en disco
+    let dlg_save = dialog.clone();
+    let status_save = status_lbl;
+    let path_save = path_row;
+    let is_json_save = is_json;
+
+    save_btn.connect_clicked(move |_| {
+        let path = path_save.text().trim().to_string();
+        let res_guard = current_res.borrow();
+        if let Some(ref res) = *res_guard {
+            let content = if *is_json_save.borrow() {
+                match res.to_json_pretty() {
+                    Ok(json) => json,
+                    Err(e) => {
+                        status_save.set_text(&format!("❌ Error serializando JSON: {e}"));
+                        status_save.add_css_class("badge-error");
+                        return;
+                    }
+                }
+            } else {
+                res.to_csv()
+            };
+
+            match std::fs::write(&path, content) {
+                Ok(_) => {
+                    dlg_save.close();
+                }
+                Err(e) => {
+                    status_save.set_text(&format!("❌ Error al escribir archivo: {e}"));
+                    status_save.add_css_class("badge-error");
+                }
+            }
+        } else {
+            status_save.set_text("No hay datos cargados para exportar");
+            status_save.add_css_class("badge-error");
+        }
+    });
+
+    dialog.present();
 }
 
 /// Construye la vista de consola SQL
@@ -372,9 +636,9 @@ fn build_sql_view(table_name: &str, engine: &str, conn: Arc<dyn DatabaseConnecti
     });
 
     // Conectar botón ejecutar
-    let ed_view_for_run = editor_view.clone();
-    let res_box_c = results_box.clone();
-    let status_c = sql_status_lbl.clone();
+    let ed_view_for_run = editor_view;
+    let res_box_c = results_box;
+    let status_c = sql_status_lbl;
 
     run_btn.connect_clicked(move |btn| {
         btn.set_sensitive(false);
@@ -474,7 +738,7 @@ fn build_structure_view(table_name: &str, conn: Arc<dyn DatabaseConnection>) -> 
     vbox.append(&scrolled);
 
     let t_name = table_name.to_string();
-    let content_c = content_box.clone();
+    let content_c = content_box;
 
     glib::spawn_future_local(async move {
         let (tx, rx) = tokio::sync::oneshot::channel();
