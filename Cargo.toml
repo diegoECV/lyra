@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/core",
     "crates/drivers/sqlite",
+    "crates/drivers/postgres",
     "crates/cli",
     "crates/app-gtk",
 ]
@@ -19,6 +20,7 @@ readme = "README.md"
 # Workspace crates
 lyra-core = { path = "crates/core" }
 lyra-driver-sqlite = { path = "crates/drivers/sqlite" }
+lyra-driver-postgres = { path = "crates/drivers/postgres" }
 
 # Async runtime & utilities
 tokio = { version = "1.43", features = ["full"] }
@@ -42,7 +44,7 @@ secrecy = { version = "0.10", features = ["serde"] }
 async-trait = "0.1"
 
 # Database drivers
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "postgres"] }
 
 # CLI argument parsing
 clap = { version = "4.5", features = ["derive"] }
