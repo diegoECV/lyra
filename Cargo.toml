@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/drivers/sqlite",
+    "crates/cli",
+    "crates/app-gtk",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Diego <diegoecv@users.noreply.github.com>"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/diegoECV/lyra"
+readme = "README.md"
+
+[workspace.dependencies]
+# Workspace crates
+lyra-core = { path = "crates/core" }
+lyra-driver-sqlite = { path = "crates/drivers/sqlite" }
+
+# Async runtime & utilities
+tokio = { version = "1.43", features = ["full"] }
+futures = "0.3"
+
+# Error handling & logging
+thiserror = "2.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Security
+secrecy = { version = "0.10", features = ["serde"] }

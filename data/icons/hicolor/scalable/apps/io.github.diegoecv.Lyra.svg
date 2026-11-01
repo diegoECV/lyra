@@ -1,0 +1,30 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'>
+  <!-- Fondo redondeado estilo GNOME / Flatpak -->
+  <rect width='160' height='160' rx='37' fill='#1A1635'/>
+  
+  <g transform='translate(22.4 22.4) scale(0.72)' fill='none'
+     stroke='#B9AEFF' stroke-linecap='round' stroke-linejoin='round'>
+    <g transform='translate(1 11)'>
+      <!-- Paralelogramo (tarjeta de base de datos) -->
+      <path d='M56 70 104 84 120 128 72 114Z' fill='#B9AEFF' fill-opacity='.14' stroke-width='3.5'/>
+      <!-- Triángulo superior de la constelación -->
+      <path d='M58 24 96 40 56 70Z' stroke-width='3.5' opacity='.7'/>
+      
+      <!-- Órbita de Vega (inclinada 28 grados) -->
+      <ellipse cx='58' cy='24' rx='23' ry='8' transform='rotate(-28 58 24)'
+               stroke='#FF9F5A' stroke-width='3'/>
+      
+      <!-- Nodos de las estrellas pequeñas (grosor 9) -->
+      <path d='M96 40h0M72 114h0' stroke-width='9'/>
+      <!-- Nodos de las estrellas principales (grosor 12) -->
+      <path d='M56 70h0M104 84h0M120 128h0' stroke-width='12'/>
+      
+      <!-- Máscara de fondo alrededor de Vega para que no choquen las líneas -->
+      <path d='M58 24h0' stroke='#1A1635' stroke-width='34'/>
+      <!-- Núcleo de Vega en naranja cálido -->
+      <path d='M58 24h0' stroke='#FF9F5A' stroke-width='22'/>
+      <!-- Pequeño electrón / satélite en la órbita -->
+      <path d='M78 13h0' stroke='#FF9F5A' stroke-width='8'/>
+    </g>
+  </g>
+</svg>
