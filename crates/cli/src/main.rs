@@ -19,14 +19,18 @@ enum Commands {
     /// Ejecuta una demostración en memoria con SQLite (crea tabla, inserta y consulta)
     Demo,
 
-    /// Ejecuta una consulta SQL en SQLite o PostgreSQL
+    /// Ejecuta una consulta en cualquier motor (SQLite, PostgreSQL, MySQL, MongoDB, Redis)
     Query {
-        /// Cadena de conexión (ej. sqlite://base.db o postgres://user:pass@localhost:5432/db)
+        /// Cadena de conexión (ej. sqlite://base.db, postgres://..., mysql://...)
         #[arg(short, long, default_value = "sqlite::memory:")]
         db: String,
 
-        /// Consulta SQL a ejecutar
-        sql: String,
+        /// Consulta a ejecutar (opción -s o --sql)
+        #[arg(short, long)]
+        sql: Option<String>,
+
+        /// Consulta posicional alternativa
+        query: Option<String>,
     },
 
     /// Lista las tablas existentes en la base de datos
@@ -54,11 +58,15 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Demo => run_demo().await?,
-        Commands::Query { db, sql } => {
+        Commands::Query { db, sql, query } => {
             let conn = connect_database(&db).await?;
             println!("Conectado a [{}]", conn.engine_name());
 
-            let result = conn.execute(&sql).await?;
+            let query_str = sql
+                .or(query)
+                .ok_or_else(|| anyhow::anyhow!("Debes proporcionar una consulta mediante -s \"...\" o como argumento posicional"))?;
+
+            let result = conn.execute(&query_str).await?;
             print_query_result(&result);
         }
         Commands::Tables { db } => {
