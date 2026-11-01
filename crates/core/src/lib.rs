@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod connection;
+pub mod error;
+pub mod result;
+pub mod schema;
+pub mod value;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// Re-exports principales para comodidad de los consumidores (drivers, cli, app-gtk)
+pub use connection::DatabaseConnection;
+pub use error::CoreError;
+pub use result::{ColumnMetadata, QueryResult, Row};
+pub use schema::{ColumnSchema, ForeignKeySchema, TableSchema};
+pub use value::Value;
