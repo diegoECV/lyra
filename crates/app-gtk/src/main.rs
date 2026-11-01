@@ -3,7 +3,7 @@ use libadwaita::gtk::{self, Box as GtkBox, Button, Label, Orientation};
 use libadwaita::prelude::*;
 use libadwaita::{
     ActionRow, Application, ApplicationWindow, Clamp, HeaderBar, PreferencesGroup, StatusPage,
-    WindowTitle,
+    ToolbarView, WindowTitle,
 };
 use lyra_core::DatabaseConnection;
 use lyra_driver_sqlite::SqliteConnection;
@@ -29,11 +29,11 @@ fn build_ui(app: &Application) {
         .show_end_title_buttons(true)
         .build();
 
-    // 2. Página de estado principal
+    // 2. Página de estado principal (con &amp; escapado para Pango markup)
     let status_page = StatusPage::builder()
         .icon_name("network-server-symbolic")
         .title("Lyra")
-        .description("Entorno listo. Gestor nativo para desarrolladores (SQL & NoSQL).")
+        .description("Entorno listo. Gestor nativo para desarrolladores (SQL &amp; NoSQL).")
         .build();
 
     // 3. Grupo de información del sistema y estado
@@ -128,7 +128,7 @@ fn build_ui(app: &Application) {
         });
     });
 
-    // 5. Contenedor principal con diseño limpio y centrado
+    // 5. Contenedor con Clamp para centrado responsivo
     let content_box = GtkBox::builder()
         .orientation(Orientation::Vertical)
         .spacing(12)
@@ -151,20 +151,22 @@ fn build_ui(app: &Application) {
     let scroll = gtk::ScrolledWindow::builder()
         .child(&clamp)
         .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .hexpand(true)
         .build();
 
-    let window_box = GtkBox::builder().orientation(Orientation::Vertical).build();
+    // 6. ToolbarView: el contenedor canónico de libadwaita para cabecera + contenido
+    let toolbar_view = ToolbarView::new();
+    toolbar_view.add_top_bar(&header);
+    toolbar_view.set_content(Some(&scroll));
 
-    window_box.append(&header);
-    window_box.append(&scroll);
-
-    // 6. Ventana de libadwaita
+    // 7. Ventana de libadwaita
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Lyra")
-        .content(&window_box)
+        .content(&toolbar_view)
         .default_width(720)
-        .default_height(580)
+        .default_height(640)
         .build();
 
     window.present();

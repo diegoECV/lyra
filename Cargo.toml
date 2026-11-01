@@ -50,5 +50,5 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 clap = { version = "4.5", features = ["derive"] }
 
 # GUI
-libadwaita = { version = "0.9" }
+libadwaita = { version = "0.9", features = ["v1_6"] }
 
