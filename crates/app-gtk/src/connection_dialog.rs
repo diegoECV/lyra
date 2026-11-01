@@ -1,12 +1,25 @@
 use crate::connection_manager::{ConnectionInfo, ConnectionManager};
 use libadwaita::glib;
 use libadwaita::gtk::prelude::*;
-use libadwaita::gtk::{Align, Box as GtkBox, Button, Entry, Label, Orientation};
+use libadwaita::gtk::{
+    self, Align, Box as GtkBox, Button, Label, Orientation, PolicyType, ScrolledWindow,
+};
 use libadwaita::prelude::*;
-use libadwaita::{HeaderBar, ToolbarView, Window as AdwWindow, WindowTitle};
+use libadwaita::{
+    ActionRow, EntryRow, HeaderBar, PasswordEntryRow, PreferencesGroup, ToolbarView,
+    Window as AdwWindow, WindowTitle,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EngineType {
+    Sqlite,
+    Postgres,
+    Mongo,
+    Redis,
+}
 
 pub fn show_connection_dialog<F>(
     parent: &libadwaita::ApplicationWindow,
@@ -19,225 +32,370 @@ pub fn show_connection_dialog<F>(
         .transient_for(parent)
         .modal(true)
         .title("Nueva Conexión")
-        .default_width(520)
-        .default_height(480)
+        .default_width(560)
+        .default_height(600)
         .build();
 
-    let vbox = GtkBox::builder()
+    let content_box = GtkBox::builder()
         .orientation(Orientation::Vertical)
-        .spacing(16)
-        .margin_start(20)
-        .margin_end(20)
-        .margin_top(16)
-        .margin_bottom(20)
+        .spacing(18)
+        .margin_start(24)
+        .margin_end(24)
+        .margin_top(18)
+        .margin_bottom(24)
         .build();
 
-    // 1. Selector visual de motor
+    let scrolled = ScrolledWindow::builder()
+        .child(&content_box)
+        .hscrollbar_policy(PolicyType::Never)
+        .vscrollbar_policy(PolicyType::Automatic)
+        .vexpand(true)
+        .build();
+
+    // 1. Selector de motor con tarjetas visuales enriquecidas
     let engine_title = Label::builder()
-        .label("Selecciona el motor de base de datos:")
+        .label("Motor de Base de Datos")
         .halign(Align::Start)
         .css_classes(["bold-title"])
         .build();
-    vbox.append(&engine_title);
+    content_box.append(&engine_title);
 
-    let engine_cards_box = GtkBox::builder()
+    let cards_box = GtkBox::builder()
         .orientation(Orientation::Horizontal)
         .spacing(10)
         .homogeneous(true)
         .build();
 
-    let sqlite_btn = Button::builder()
-        .label("🗄️\nSQLite")
-        .css_classes(["engine-card", "engine-card-selected"])
+    fn create_engine_card(icon_name: &str, title: &str, subtitle: &str) -> Button {
+        let card_box = GtkBox::builder()
+            .orientation(Orientation::Vertical)
+            .spacing(4)
+            .halign(Align::Center)
+            .valign(Align::Center)
+            .build();
+
+        let icon = gtk::Image::from_icon_name(icon_name);
+        icon.set_pixel_size(24);
+
+        let title_lbl = Label::builder()
+            .label(title)
+            .css_classes(["card-title"])
+            .build();
+
+        let sub_lbl = Label::builder()
+            .label(subtitle)
+            .css_classes(["card-subtitle"])
+            .build();
+
+        card_box.append(&icon);
+        card_box.append(&title_lbl);
+        card_box.append(&sub_lbl);
+
+        Button::builder()
+            .child(&card_box)
+            .css_classes(["engine-card"])
+            .build()
+    }
+
+    let sqlite_card = create_engine_card("drive-harddisk-symbolic", "SQLite", "Local / Memoria");
+    sqlite_card.add_css_class("engine-card-selected");
+
+    let pg_card = create_engine_card("network-server-symbolic", "PostgreSQL", "Puerto 5432");
+    let mongo_card = create_engine_card("emblem-documents-symbolic", "MongoDB", "Puerto 27017");
+    let redis_card = create_engine_card("view-list-bullet-symbolic", "Redis", "Puerto 6379");
+
+    cards_box.append(&sqlite_card);
+    cards_box.append(&pg_card);
+    cards_box.append(&mongo_card);
+    cards_box.append(&redis_card);
+    content_box.append(&cards_box);
+
+    // 2. Grupo de campos de configuración estructurada (AdwEntryRow / AdwPreferencesGroup)
+    let config_group = PreferencesGroup::builder()
+        .title("Parámetros de Conexión")
+        .description("Credenciales y ubicación del servidor")
         .build();
 
-    let pg_btn = Button::builder()
-        .label("🐘\nPostgreSQL")
-        .css_classes(["engine-card"])
-        .build();
-
-    let mongo_btn = Button::builder()
-        .label("🍃\nMongoDB")
-        .css_classes(["engine-card"])
-        .build();
-
-    let redis_btn = Button::builder()
-        .label("⚡\nRedis")
-        .css_classes(["engine-card"])
-        .build();
-
-    engine_cards_box.append(&sqlite_btn);
-    engine_cards_box.append(&pg_btn);
-    engine_cards_box.append(&mongo_btn);
-    engine_cards_box.append(&redis_btn);
-    vbox.append(&engine_cards_box);
-
-    // 2. Campos de entrada
-    let form_box = GtkBox::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(12)
-        .margin_top(8)
-        .build();
-
-    let name_lbl = Label::builder()
-        .label("Nombre de la conexión:")
-        .halign(Align::Start)
-        .css_classes(["subtle-label"])
-        .build();
-
-    let name_entry = Entry::builder()
+    let name_row = EntryRow::builder()
+        .title("Nombre de la conexión")
         .text("Base de Datos SQLite")
-        .placeholder_text("Ej. Producción, Datos Locales...")
         .build();
 
-    let url_lbl = Label::builder()
-        .label("Cadena de conexión (URL):")
-        .halign(Align::Start)
-        .css_classes(["subtle-label"])
+    let host_row = EntryRow::builder()
+        .title("Host")
+        .text("localhost")
         .build();
 
-    let url_entry = Entry::builder()
+    let port_row = EntryRow::builder()
+        .title("Puerto")
+        .text("5432")
+        .build();
+
+    let db_row = EntryRow::builder()
+        .title("Base de Datos / Colección")
+        .text("postgres")
+        .build();
+
+    let user_row = EntryRow::builder()
+        .title("Usuario")
+        .text("postgres")
+        .build();
+
+    let pass_row = PasswordEntryRow::builder()
+        .title("Contraseña")
+        .build();
+
+    let uri_row = EntryRow::builder()
+        .title("Cadena de Conexión (URI)")
         .text("sqlite::memory:")
-        .placeholder_text("sqlite::memory: o sqlite:///ruta/archivo.db")
         .build();
 
-    form_box.append(&name_lbl);
-    form_box.append(&name_entry);
-    form_box.append(&url_lbl);
-    form_box.append(&url_entry);
-    vbox.append(&form_box);
+    config_group.add(&name_row);
+    config_group.add(&host_row);
+    config_group.add(&port_row);
+    config_group.add(&db_row);
+    config_group.add(&user_row);
+    config_group.add(&pass_row);
+    config_group.add(&uri_row);
 
-    // Cambiar plantillas al presionar tarjetas de motor
-    let buttons = [
-        sqlite_btn.clone(),
-        pg_btn.clone(),
-        mongo_btn.clone(),
-        redis_btn.clone(),
-    ];
-    let clear_selection = {
-        let buttons = buttons.clone();
-        move || {
-            for b in &buttons {
-                b.remove_css_class("engine-card-selected");
+    content_box.append(&config_group);
+
+    // Estado del motor activo
+    let current_engine = Rc::new(RefCell::new(EngineType::Sqlite));
+
+    // Función para actualizar visibilidad y valores según motor
+    let update_form_for_engine = {
+        let host = host_row.clone();
+        let port = port_row.clone();
+        let db = db_row.clone();
+        let user = user_row.clone();
+        let pass = pass_row.clone();
+        let uri = uri_row.clone();
+        let name = name_row.clone();
+
+        move |engine: EngineType| {
+            match engine {
+                EngineType::Sqlite => {
+                    host.set_visible(false);
+                    port.set_visible(false);
+                    db.set_visible(false);
+                    user.set_visible(false);
+                    pass.set_visible(false);
+                    uri.set_visible(true);
+                    name.set_text("Base de Datos SQLite");
+                    uri.set_text("sqlite::memory:");
+                }
+                EngineType::Postgres => {
+                    host.set_visible(true);
+                    port.set_visible(true);
+                    db.set_visible(true);
+                    user.set_visible(true);
+                    pass.set_visible(true);
+                    uri.set_visible(true);
+                    name.set_text("PostgreSQL Servidor");
+                    host.set_text("localhost");
+                    port.set_text("5432");
+                    db.set_text("postgres");
+                    user.set_text("postgres");
+                    pass.set_text("");
+                    uri.set_text("postgres://postgres@localhost:5432/postgres");
+                }
+                EngineType::Mongo => {
+                    host.set_visible(true);
+                    port.set_visible(true);
+                    db.set_visible(true);
+                    user.set_visible(true);
+                    pass.set_visible(true);
+                    uri.set_visible(true);
+                    name.set_text("MongoDB Colecciones");
+                    host.set_text("localhost");
+                    port.set_text("27017");
+                    db.set_text("admin");
+                    user.set_text("");
+                    pass.set_text("");
+                    uri.set_text("mongodb://localhost:27017/admin");
+                }
+                EngineType::Redis => {
+                    host.set_visible(true);
+                    port.set_visible(true);
+                    db.set_visible(false);
+                    user.set_visible(false);
+                    pass.set_visible(true);
+                    uri.set_visible(true);
+                    name.set_text("Redis Caché");
+                    host.set_text("127.0.0.1");
+                    port.set_text("6379");
+                    pass.set_text("");
+                    uri.set_text("redis://127.0.0.1:6379");
+                }
+            }
+        }
+    };
+
+    // Inicializar con SQLite (ocultando host/port iniciales)
+    update_form_for_engine(EngineType::Sqlite);
+
+    // Función auxiliar para construir la URL calculada
+    let get_effective_url = {
+        let current_engine = current_engine.clone();
+        let uri = uri_row.clone();
+        let host = host_row.clone();
+        let port = port_row.clone();
+        let db = db_row.clone();
+        let user = user_row.clone();
+        let pass = pass_row.clone();
+
+        move || -> String {
+            let direct_uri = uri.text().trim().to_string();
+            let engine = *current_engine.borrow();
+
+            match engine {
+                EngineType::Sqlite => {
+                    if direct_uri.is_empty() {
+                        "sqlite::memory:".to_string()
+                    } else {
+                        direct_uri
+                    }
+                }
+                EngineType::Postgres => {
+                    let h = host.text();
+                    let p = port.text();
+                    let d = db.text();
+                    let u = user.text();
+                    let pwd = pass.text();
+
+                    if !direct_uri.is_empty() && direct_uri.starts_with("postgres") {
+                        direct_uri
+                    } else if pwd.is_empty() {
+                        format!("postgres://{u}@{h}:{p}/{d}")
+                    } else {
+                        format!("postgres://{u}:{pwd}@{h}:{p}/{d}")
+                    }
+                }
+                EngineType::Mongo => {
+                    let h = host.text();
+                    let p = port.text();
+                    let d = db.text();
+                    let u = user.text();
+                    let pwd = pass.text();
+
+                    if !direct_uri.is_empty() && direct_uri.starts_with("mongodb") {
+                        direct_uri
+                    } else if u.is_empty() {
+                        format!("mongodb://{h}:{p}/{d}")
+                    } else {
+                        format!("mongodb://{u}:{pwd}@{h}:{p}/{d}")
+                    }
+                }
+                EngineType::Redis => {
+                    let h = host.text();
+                    let p = port.text();
+                    let pwd = pass.text();
+
+                    if !direct_uri.is_empty() && direct_uri.starts_with("redis") {
+                        direct_uri
+                    } else if pwd.is_empty() {
+                        format!("redis://{h}:{p}")
+                    } else {
+                        format!("redis://:{pwd}@{h}:{p}")
+                    }
+                }
+            }
+        }
+    };
+
+    // Eventos de selección de tarjeta
+    let cards = [sqlite_card.clone(), pg_card.clone(), mongo_card.clone(), redis_card.clone()];
+    let select_card = {
+        let cards = cards.clone();
+        move |selected_idx: usize| {
+            for (idx, card) in cards.iter().enumerate() {
+                if idx == selected_idx {
+                    card.add_css_class("engine-card-selected");
+                } else {
+                    card.remove_css_class("engine-card-selected");
+                }
             }
         }
     };
 
     {
-        let clear_sel = clear_selection.clone();
-        let btn_c = sqlite_btn.clone();
-        let name_e = name_entry.clone();
-        let url_e = url_entry.clone();
-        sqlite_btn.connect_clicked(move |_| {
-            clear_sel();
-            btn_c.add_css_class("engine-card-selected");
-            name_e.set_text("Base de Datos SQLite");
-            url_e.set_text("sqlite::memory:");
-            url_e.set_placeholder_text(Some("sqlite::memory: o sqlite:///ruta/archivo.db"));
+        let sel = select_card.clone();
+        let update = update_form_for_engine.clone();
+        let curr = current_engine.clone();
+        sqlite_card.connect_clicked(move |_| {
+            sel(0);
+            *curr.borrow_mut() = EngineType::Sqlite;
+            update(EngineType::Sqlite);
         });
     }
 
     {
-        let clear_sel = clear_selection.clone();
-        let btn_c = pg_btn.clone();
-        let name_e = name_entry.clone();
-        let url_e = url_entry.clone();
-        pg_btn.connect_clicked(move |_| {
-            clear_sel();
-            btn_c.add_css_class("engine-card-selected");
-            name_e.set_text("PostgreSQL Servidor");
-            url_e.set_text("postgres://postgres:password@localhost:5432/postgres");
-            url_e.set_placeholder_text(Some("postgres://user:pass@host:port/database"));
+        let sel = select_card.clone();
+        let update = update_form_for_engine.clone();
+        let curr = current_engine.clone();
+        pg_card.connect_clicked(move |_| {
+            sel(1);
+            *curr.borrow_mut() = EngineType::Postgres;
+            update(EngineType::Postgres);
         });
     }
 
     {
-        let clear_sel = clear_selection.clone();
-        let btn_c = mongo_btn.clone();
-        let name_e = name_entry.clone();
-        let url_e = url_entry.clone();
-        mongo_btn.connect_clicked(move |_| {
-            clear_sel();
-            btn_c.add_css_class("engine-card-selected");
-            name_e.set_text("MongoDB Colecciones");
-            url_e.set_text("mongodb://localhost:27017/admin");
-            url_e.set_placeholder_text(Some("mongodb://localhost:27017/database"));
+        let sel = select_card.clone();
+        let update = update_form_for_engine.clone();
+        let curr = current_engine.clone();
+        mongo_card.connect_clicked(move |_| {
+            sel(2);
+            *curr.borrow_mut() = EngineType::Mongo;
+            update(EngineType::Mongo);
         });
     }
 
     {
-        let clear_sel = clear_selection;
-        let btn_c = redis_btn.clone();
-        let name_e = name_entry.clone();
-        let url_e = url_entry.clone();
-        redis_btn.connect_clicked(move |_| {
-            clear_sel();
-            btn_c.add_css_class("engine-card-selected");
-            name_e.set_text("Redis Caché");
-            url_e.set_text("redis://127.0.0.1:6379");
-            url_e.set_placeholder_text(Some("redis://127.0.0.1:6379"));
+        let sel = select_card;
+        let update = update_form_for_engine;
+        let curr = current_engine.clone();
+        redis_card.connect_clicked(move |_| {
+            sel(3);
+            *curr.borrow_mut() = EngineType::Redis;
+            update(EngineType::Redis);
         });
     }
 
-    // 3. Estado de prueba
-    let test_status_lbl = Label::builder()
-        .label("")
-        .halign(Align::Start)
-        .hexpand(true)
-        .build();
-    vbox.append(&test_status_lbl);
-
-    // 4. Botones de acción inferiores
-    let actions_box = GtkBox::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(12)
-        .margin_top(10)
+    // 3. Grupo de Diagnóstico y Prueba
+    let diag_group = PreferencesGroup::builder()
+        .title("Diagnóstico de Conectividad")
+        .description("Comprueba si el servidor está activo y responde")
         .build();
 
-    let test_btn = Button::builder().label("⚡ Probar Conexión").build();
+    let test_action_row = ActionRow::builder()
+        .title("Probar Conexión")
+        .subtitle("Pulsa 'Probar' para verificar la latencia y credenciales")
+        .build();
+    test_action_row.add_prefix(&gtk::Image::from_icon_name("network-transmit-receive-symbolic"));
 
-    let cancel_btn = Button::builder().label("Cancelar").build();
-
-    let connect_btn = Button::builder()
-        .label("Conectar")
-        .css_classes(["suggested-action", "pill"])
+    let test_btn = Button::builder()
+        .label("⚡ Probar")
+        .valign(Align::Center)
         .build();
 
-    actions_box.append(&test_btn);
-    actions_box.append(&test_status_lbl);
-    actions_box.append(&cancel_btn);
-    actions_box.append(&connect_btn);
-    vbox.append(&actions_box);
+    test_action_row.add_suffix(&test_btn);
+    diag_group.add(&test_action_row);
+    content_box.append(&diag_group);
 
-    let header = HeaderBar::builder()
-        .title_widget(&WindowTitle::new("Añadir Base de Datos", "SQL & NoSQL"))
-        .show_end_title_buttons(true)
-        .build();
+    // Evento de prueba de conexión
+    let get_url_for_test = get_effective_url.clone();
+    let row_c = test_action_row.clone();
+    let btn_c = test_btn.clone();
 
-    let toolbar = ToolbarView::new();
-    toolbar.add_top_bar(&header);
-    toolbar.set_content(Some(&vbox));
-    dialog.set_content(Some(&toolbar));
-
-    // Cancelar
-    let dlg_c = dialog.clone();
-    cancel_btn.connect_clicked(move |_| {
-        dlg_c.close();
-    });
-
-    // Probar conexión
-    let url_e_test = url_entry.clone();
-    let test_lbl = test_status_lbl.clone();
-    let test_btn_c = test_btn.clone();
     test_btn.connect_clicked(move |_| {
-        let url = url_e_test.text().to_string();
-        test_btn_c.set_sensitive(false);
-        test_lbl.set_text("Probando conexión...");
-        test_lbl.remove_css_class("badge-success");
-        test_lbl.remove_css_class("badge-error");
+        let url = get_url_for_test();
+        btn_c.set_sensitive(false);
+        row_c.set_subtitle("Conectando con el servidor...");
 
-        let test_lbl_inner = test_lbl.clone();
-        let btn_inner = test_btn_c.clone();
+        let row_inner = row_c.clone();
+        let btn_inner = btn_c.clone();
 
         glib::spawn_future_local(async move {
             let (tx, rx) = tokio::sync::oneshot::channel();
@@ -259,13 +417,12 @@ pub fn show_connection_dialog<F>(
             if let Ok(res) = rx.await {
                 match res {
                     Ok((engine, elapsed)) => {
-                        test_lbl_inner
-                            .set_text(&format!("✔ Conexión {engine} exitosa ({elapsed} ms)"));
-                        test_lbl_inner.add_css_class("badge-success");
+                        row_inner.set_subtitle(&format!(
+                            "✔ Conexión exitosa a {engine} (Latencia: {elapsed} ms)"
+                        ));
                     }
                     Err(e) => {
-                        test_lbl_inner.set_text(&format!("❌ {e}"));
-                        test_lbl_inner.add_css_class("badge-error");
+                        row_inner.set_subtitle(&format!("❌ Fallo de conexión: {e}"));
                     }
                 }
             }
@@ -273,22 +430,47 @@ pub fn show_connection_dialog<F>(
         });
     });
 
-    // Guardar y conectar
+    // 4. Encabezado con Cancelar y Conectar
+    let cancel_btn = Button::builder().label("Cancelar").build();
+    let connect_btn = Button::builder()
+        .label("Conectar")
+        .css_classes(["suggested-action", "pill"])
+        .build();
+
+    let header = HeaderBar::builder()
+        .title_widget(&WindowTitle::new("Añadir Base de Datos", "SQL & NoSQL"))
+        .show_end_title_buttons(false)
+        .build();
+    header.pack_start(&cancel_btn);
+    header.pack_end(&connect_btn);
+
+    let toolbar = ToolbarView::new();
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(&scrolled));
+    dialog.set_content(Some(&toolbar));
+
+    // Cancelar
+    let dlg_c = dialog.clone();
+    cancel_btn.connect_clicked(move |_| {
+        dlg_c.close();
+    });
+
+    // Conectar y guardar
     let on_connected_rc = Rc::new(on_connected);
     let dlg_for_conn = dialog.clone();
-    let name_for_conn = name_entry;
-    let url_for_conn = url_entry;
+    let name_for_conn = name_row;
+    let get_url_for_conn = get_effective_url;
 
     connect_btn.connect_clicked(move |btn| {
-        let name = name_for_conn.text().to_string();
-        let url = url_for_conn.text().to_string();
+        let name = name_for_conn.text().trim().to_string();
+        let url = get_url_for_conn();
         btn.set_sensitive(false);
         btn.set_label("Conectando...");
 
         let mgr_cell = mgr_cell.clone();
         let on_conn = on_connected_rc.clone();
         let dlg = dlg_for_conn.clone();
-        let btn_c = btn.clone();
+        let btn_inner = btn.clone();
 
         glib::spawn_future_local(async move {
             let (tx, rx) = tokio::sync::oneshot::channel();
@@ -329,8 +511,8 @@ pub fn show_connection_dialog<F>(
                         dlg.close();
                     }
                     Err(e) => {
-                        btn_c.set_label("Error");
-                        btn_c.set_sensitive(true);
+                        btn_inner.set_label("Error");
+                        btn_inner.set_sensitive(true);
                         eprintln!("Error al conectar: {e}");
                     }
                 }
