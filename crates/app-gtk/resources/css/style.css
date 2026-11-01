@@ -1,0 +1,53 @@
+/* Estilos personalizados para Lyra */
+
+.lyra-header {
+    background-color: #1A1635;
+    color: #FFFFFF;
+}
+
+.lyra-accent-btn {
+    background-color: #5B4BD6;
+    color: #FFFFFF;
+    font-weight: bold;
+    border-radius: 8px;
+    padding: 6px 14px;
+}
+
+.lyra-accent-btn:hover {
+    background-color: #6C5CE7;
+}
+
+.env-badge-dev {
+    background-color: rgba(46, 194, 126, 0.15);
+    color: #2ec27e;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 12px;
+    padding: 3px 10px;
+}
+
+.query-editor {
+    font-family: monospace;
+    font-size: 13px;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+}
+
+.table-header-cell {
+    font-weight: bold;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-data-cell {
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.table-data-cell-alt {
+    padding: 6px 12px;
+    background-color: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}

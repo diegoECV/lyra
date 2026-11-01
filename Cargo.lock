@@ -1637,7 +1637,9 @@ version = "0.1.0"
 dependencies = [
  "libadwaita",
  "lyra-core",
+ "lyra-driver-mongodb",
  "lyra-driver-postgres",
+ "lyra-driver-redis",
  "lyra-driver-sqlite",
  "tokio",
  "tracing",
