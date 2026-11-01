@@ -8,6 +8,7 @@ authors.workspace = true
 [dependencies]
 lyra-core = { workspace = true }
 lyra-driver-sqlite = { workspace = true }
+lyra-driver-postgres = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }

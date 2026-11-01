@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use lyra_core::{DatabaseConnection, QueryResult, TableSchema};
+use lyra_driver_postgres::PostgresConnection;
 use lyra_driver_sqlite::SqliteConnection;
 
 #[derive(Parser)]
@@ -18,9 +19,9 @@ enum Commands {
     /// Ejecuta una demostración en memoria con SQLite (crea tabla, inserta y consulta)
     Demo,
 
-    /// Ejecuta una consulta SQL en una base de datos SQLite
+    /// Ejecuta una consulta SQL en SQLite o PostgreSQL
     Query {
-        /// Ruta al archivo SQLite (ej. ./mi_base.db o :memory:)
+        /// Cadena de conexión (ej. sqlite://base.db o postgres://user:pass@localhost:5432/db)
         #[arg(short, long, default_value = "sqlite::memory:")]
         db: String,
 
@@ -30,14 +31,14 @@ enum Commands {
 
     /// Lista las tablas existentes en la base de datos
     Tables {
-        /// Ruta al archivo SQLite (ej. ./mi_base.db)
+        /// Cadena de conexión a la base de datos
         #[arg(short, long)]
         db: String,
     },
 
     /// Muestra la estructura y columnas de una tabla
     Describe {
-        /// Ruta al archivo SQLite
+        /// Cadena de conexión a la base de datos
         #[arg(short, long)]
         db: String,
 
@@ -54,32 +55,46 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Demo => run_demo().await?,
         Commands::Query { db, sql } => {
-            let conn_url = normalize_sqlite_url(&db);
-            let conn = SqliteConnection::connect(&conn_url).await?;
-            println!("Conectado a {} [{}]", conn.url(), conn.engine_name());
+            let conn = connect_database(&db).await?;
+            println!("Conectado a [{}]", conn.engine_name());
 
             let result = conn.execute(&sql).await?;
             print_query_result(&result);
         }
         Commands::Tables { db } => {
-            let conn_url = normalize_sqlite_url(&db);
-            let conn = SqliteConnection::connect(&conn_url).await?;
+            let conn = connect_database(&db).await?;
             let tables = conn.list_tables().await?;
 
-            println!("Tablas encontradas ({}):", tables.len());
+            println!(
+                "Tablas encontradas en {} ({}):",
+                conn.engine_name(),
+                tables.len()
+            );
             for t in tables {
                 println!("  • {t}");
             }
         }
         Commands::Describe { db, table } => {
-            let conn_url = normalize_sqlite_url(&db);
-            let conn = SqliteConnection::connect(&conn_url).await?;
+            let conn = connect_database(&db).await?;
             let schema = conn.describe_table(&table).await?;
             print_table_schema(&schema);
         }
     }
 
     Ok(())
+}
+
+/// Fábrica polimórfica que devuelve una conexión abstracta Box<dyn DatabaseConnection>
+/// según el esquema de la URL proporcionada.
+async fn connect_database(url: &str) -> Result<Box<dyn DatabaseConnection>> {
+    if url.starts_with("postgres://") || url.starts_with("postgresql://") {
+        let conn = PostgresConnection::connect(url).await?;
+        Ok(Box::new(conn))
+    } else {
+        let norm = normalize_sqlite_url(url);
+        let conn = SqliteConnection::connect(&norm).await?;
+        Ok(Box::new(conn))
+    }
 }
 
 fn normalize_sqlite_url(path: &str) -> String {
@@ -167,18 +182,16 @@ fn print_query_result(res: &QueryResult) {
         return;
     }
 
-    // Calcular ancho máximo por columna
     let mut widths: Vec<usize> = res.columns.iter().map(|c| c.name.len().max(8)).collect();
     for row in &res.rows {
         for (i, val) in row.values.iter().enumerate() {
             let len = val.to_string().len();
             if len > widths[i] {
-                widths[i] = len.min(40); // Límite para no desbordar terminal
+                widths[i] = len.min(40);
             }
         }
     }
 
-    // Encabezado
     let sep: String = widths
         .iter()
         .map(|w| "─".repeat(w + 2))
@@ -201,7 +214,6 @@ fn print_query_result(res: &QueryResult) {
         .join("┼");
     println!("├{mid_sep}┤");
 
-    // Filas
     for row in &res.rows {
         let row_cols: Vec<String> = row
             .values
